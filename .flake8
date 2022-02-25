@@ -1,0 +1,14 @@
+[flake8]
+# Ignore style and complexity
+# E: style errors
+# W: style warnings
+# C: complexity
+# D: docstrings
+# I: import style
+ignore = E, C, W, I
+exclude =
+    .cache,
+    .github,
+    docs,
+    build,
+    dist,
