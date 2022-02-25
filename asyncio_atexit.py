@@ -9,7 +9,7 @@ import weakref
 from functools import partial
 
 __all__ = ["register", "unregister"]
-__version__ = "1.0.0.dev"
+__version__ = "1.0.0"
 
 _registry = weakref.WeakKeyDictionary()
 
