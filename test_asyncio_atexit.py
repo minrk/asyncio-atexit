@@ -1,6 +1,13 @@
 import asyncio
 import sys
 
+try:
+    import uvloop
+except ImportError:
+    uvloop = None
+
+import pytest
+
 import asyncio_atexit
 
 if sys.version_info >= (3, 7):
@@ -15,7 +22,24 @@ else:
             loop.close()
 
 
-def test_asyncio_atexit():
+policies = ["default"]
+if uvloop is not None:
+    policies.append("uvloop")
+
+
+@pytest.fixture(params=policies)
+def policy(request):
+    before_policy = asyncio.get_event_loop_policy()
+    if request.param == "default":
+        policy = asyncio.DefaultEventLoopPolicy()
+    elif request.param == "uvloop":
+        policy = uvloop.EventLoopPolicy()
+    asyncio.set_event_loop_policy(policy)
+    yield
+    asyncio.set_event_loop_policy(before_policy)
+
+
+def test_asyncio_atexit(policy):
     sync_called = False
     async_called = False
 
@@ -37,7 +61,7 @@ def test_asyncio_atexit():
     assert async_called
 
 
-def test_unregister():
+def test_unregister(policy):
     sync_called = False
 
     def sync_cb():
