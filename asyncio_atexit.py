@@ -21,7 +21,13 @@ else:
 
 class _RegistryEntry:
     def __init__(self, loop):
-        self._close_ref = weakref.WeakMethod(loop.close)
+        try:
+            self._close_ref = weakref.WeakMethod(loop.close)
+        except TypeError:
+            # not everything can be weakref'd (Extensions such as uvloop).
+            # Hold a regular reference _on the object_, in those cases
+            loop._atexit_orig_close = loop.close
+            self._close_ref = lambda: loop._atexit_orig_close
         self.callbacks = []
 
     def close(self):
