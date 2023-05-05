@@ -75,3 +75,20 @@ def test_unregister(policy):
 
     asyncio_run(test())
     assert not sync_called
+
+
+def test_run_raises(policy):
+    sync_called = False
+
+    def sync_cb():
+        nonlocal sync_called
+        sync_called = True
+
+    async def test():
+        asyncio_atexit.register(sync_cb)
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        asyncio_run(test())
+
+    assert sync_called

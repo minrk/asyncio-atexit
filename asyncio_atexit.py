@@ -21,12 +21,16 @@ else:
 
 class _RegistryEntry:
     def __init__(self, loop):
+        if not hasattr(loop, "_atexit_orig_close"):
+            # avoid double-patching
+            # weakrefs can get unresolved and then close called in __del__,
+            # so this seems unavoidable
+            loop._atexit_orig_close = loop.close
         try:
-            self._close_ref = weakref.WeakMethod(loop.close)
+            self._close_ref = weakref.WeakMethod(loop._atexit_orig_close)
         except TypeError:
             # not everything can be weakref'd (Extensions such as uvloop).
             # Hold a regular reference _on the object_, in those cases
-            loop._atexit_orig_close = loop.close
             self._close_ref = lambda: loop._atexit_orig_close
         self.callbacks = []
 
