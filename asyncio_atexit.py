@@ -3,6 +3,7 @@ asyncio_atexit: atexit for asyncio
 """
 
 import asyncio
+import atexit
 import inspect
 import sys
 import weakref
@@ -33,8 +34,15 @@ class _RegistryEntry:
             # Hold a regular reference _on the object_, in those cases
             self._close_ref = lambda: loop._atexit_orig_close
         self.callbacks = []
+        loop_ref = weakref.ref(loop)
+        self._atexit_handle = partial(_atexit_close_loop, loop_ref)
+        atexit.register(self._atexit_handle)
+
+    def _unregister(self):
+        atexit.unregister(self._atexit_handle)
 
     def close(self):
+        self._unregister()
         return self._close_ref()()
 
 
@@ -73,6 +81,10 @@ def unregister(callback, *, loop=None):
             entry.callbacks.remove(callback)
         except ValueError:
             break
+
+    if not entry.callbacks:
+        # no callbacks registered, unregister the atexit close callback as well
+        entry._unregister()
 
 
 def _get_entry(loop=None):
@@ -120,3 +132,19 @@ def _asyncio_atexit_close(loop):
         loop.run_until_complete(_run_asyncio_atexits(loop, entry.callbacks))
     entry.callbacks[:] = []
     return entry.close()
+
+
+def _atexit_close_loop(loop_ref, *args):
+    """
+    atexit callback to call loop.close
+
+    Register loop.close with atexit,
+    so we are more confident that loop.close will actually be called.
+    """
+    loop = loop_ref()
+    if loop is None:
+        return
+    try:
+        loop.close()
+    except Exception as e:
+        print(f"Exception in asyncio event_loop.close: {e}", file=sys.stderr)

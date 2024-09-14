@@ -92,3 +92,22 @@ def test_run_raises(policy):
         asyncio_run(test())
 
     assert sync_called
+
+
+def test_atexit_hook(policy):
+    loop = asyncio.new_event_loop()
+    sync_called = False
+
+    def sync_cb():
+        nonlocal sync_called
+        sync_called = True
+
+    async def test():
+        asyncio_atexit.register(sync_cb)
+
+    loop.run_until_complete(test())
+    assert loop in asyncio_atexit._registry
+    # can't easily test true atexit invocations
+    entry = asyncio_atexit._get_entry(loop)
+    entry._atexit_handle(*sys.exc_info())
+    assert loop._closed
