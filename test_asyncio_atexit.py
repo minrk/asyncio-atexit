@@ -154,7 +154,9 @@ def test_i1_blocking_sync_callback_is_bounded(policy):
     try:
         elapsed = _time_close(lambda: asyncio_atexit.register(hangs_forever, timeout=1))
         assert entered.is_set(), "the blocking callback never ran"
-        assert elapsed < 20, f"close took {elapsed:.1f}s; the hung callback was not abandoned"
+        assert (
+            elapsed < 20
+        ), f"close took {elapsed:.1f}s; the hung callback was not abandoned"
     finally:
         release.set()
 
@@ -166,7 +168,9 @@ def test_i1_hanging_coroutine_callback_is_bounded(policy):
 
     elapsed = _time_close(lambda: asyncio_atexit.register(never_resolves, timeout=1))
 
-    assert elapsed < 20, f"close took {elapsed:.1f}s; the hung coroutine was not abandoned"
+    assert (
+        elapsed < 20
+    ), f"close took {elapsed:.1f}s; the hung coroutine was not abandoned"
 
 
 @pytest.mark.timeout(90)
@@ -192,9 +196,9 @@ def test_i1_total_close_time_is_bounded_by_the_sum_of_timeouts(policy):
             f"close took only {elapsed:.1f}s for {len(timeouts)} hung callbacks; they did not "
             "each get their own bound"
         )
-        assert elapsed < sum(timeouts) + 15, (
-            f"close took {elapsed:.1f}s, well past the {sum(timeouts)}s of declared bounds"
-        )
+        assert (
+            elapsed < sum(timeouts) + 15
+        ), f"close took {elapsed:.1f}s, well past the {sum(timeouts)}s of declared bounds"
     finally:
         release.set()
 
@@ -248,9 +252,9 @@ def test_i3_off_thread_exception_is_reported_not_left_to_excepthook(policy, capl
         threading.excepthook = original_hook
 
     assert escaped == [], f"an exception escaped to threading.excepthook: {escaped}"
-    assert any("boom" in r.getMessage() for r in caplog.records), (
-        f"the failure was not reported; saw: {[r.getMessage() for r in caplog.records]}"
-    )
+    assert any(
+        "boom" in r.getMessage() for r in caplog.records
+    ), f"the failure was not reported; saw: {[r.getMessage() for r in caplog.records]}"
 
 
 def test_sync_callable_returning_an_awaitable_is_awaited(policy):
@@ -302,7 +306,8 @@ def test_i4_watchdog_is_armed_before_callbacks_run(policy):
 
     _time_close(
         lambda: asyncio_atexit.register(
-            lambda: armed_when_callback_ran.append(asyncio_atexit._watchdog_armed), timeout=5
+            lambda: armed_when_callback_ran.append(asyncio_atexit._watchdog_armed),
+            timeout=5,
         )
     )
 
@@ -359,7 +364,11 @@ def test_watchdog_actually_terminates_a_wedged_process():
     )
     elapsed = time.monotonic() - started
 
-    assert "closing" in result.stdout, f"the child never reached loop.close(); stderr: {result.stderr}"
-    assert "SHOULD NEVER GET HERE" not in result.stdout, "loop.close() returned, so nothing was wedged"
+    assert (
+        "closing" in result.stdout
+    ), f"the child never reached loop.close(); stderr: {result.stderr}"
+    assert (
+        "SHOULD NEVER GET HERE" not in result.stdout
+    ), "loop.close() returned, so nothing was wedged"
     assert result.returncode == 0, f"watchdog exited {result.returncode}, expected 0"
     assert elapsed < 60, f"process took {elapsed:.1f}s to die against a 2s grace"

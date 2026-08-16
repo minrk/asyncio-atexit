@@ -99,10 +99,10 @@ DEFAULT_CALLBACK_TIMEOUT_SECONDS: float = 10.0
 # it prevents is unbounded, so erring high costs little.
 DEFAULT_EXIT_GRACE_SECONDS: float = 90.0
 
-_registry: "weakref.WeakKeyDictionary[Any, _RegistryEntry]" = weakref.WeakKeyDictionary()
+_registry: weakref.WeakKeyDictionary[Any, _RegistryEntry] = weakref.WeakKeyDictionary()
 
 _watchdog_lock = threading.Lock()
-_watchdog_grace_seconds: Optional[float] = None
+_watchdog_grace_seconds: float | None = None
 _watchdog_armed = False
 
 
@@ -122,7 +122,7 @@ class _RegistryEntry:
             # reference _on the object_ in those cases.
             loop._atexit_orig_close = loop.close
             self._close_ref = lambda: loop._atexit_orig_close
-        self.callbacks: List[Tuple[Callable[[], Any], float]] = []
+        self.callbacks: list[tuple[Callable[[], Any], float]] = []
 
     def close(self) -> Any:
         original_close = self._close_ref()
@@ -136,7 +136,7 @@ class _RegistryEntry:
 def register(
     callback: Callable[[], Any],
     *,
-    loop: Optional[asyncio.AbstractEventLoop] = None,
+    loop: asyncio.AbstractEventLoop | None = None,
     timeout: float = DEFAULT_CALLBACK_TIMEOUT_SECONDS,
 ) -> None:
     """
@@ -157,7 +157,7 @@ def register(
 def unregister(
     callback: Callable[[], Any],
     *,
-    loop: Optional[asyncio.AbstractEventLoop] = None,
+    loop: asyncio.AbstractEventLoop | None = None,
 ) -> None:
     """
     Unregister every registration of `callback`, whatever timeout it was registered with.
@@ -180,7 +180,7 @@ def enable_exit_watchdog(grace_seconds: float = DEFAULT_EXIT_GRACE_SECONDS) -> N
         _watchdog_grace_seconds = grace_seconds
 
 
-def arm_exit_watchdog(grace_seconds: Optional[float] = None) -> bool:
+def arm_exit_watchdog(grace_seconds: float | None = None) -> bool:
     """
     Start the clock on process exit. Returns immediately; True if this call armed it.
 
@@ -211,7 +211,9 @@ def arm_exit_watchdog(grace_seconds: Optional[float] = None) -> bool:
         # loop close, which is the point - that machinery is what is hung.
         os._exit(_WATCHDOG_EXIT_CODE)
 
-    threading.Thread(target=_force_exit, daemon=True, name="asyncio-atexit-watchdog").start()
+    threading.Thread(
+        target=_force_exit, daemon=True, name="asyncio-atexit-watchdog"
+    ).start()
     return True
 
 
@@ -229,7 +231,7 @@ def set_watchdog_exit_code(code: int) -> None:
     _WATCHDOG_EXIT_CODE = code
 
 
-def _get_entry(loop: Optional[asyncio.AbstractEventLoop] = None) -> _RegistryEntry:
+def _get_entry(loop: asyncio.AbstractEventLoop | None = None) -> _RegistryEntry:
     """Get the registry entry for an event loop."""
     if loop is None:
         loop = asyncio.get_running_loop()
@@ -263,7 +265,7 @@ async def _run_in_daemon_thread(fn: Callable[[], Any], *, timeout: float) -> Any
     """
     loop = asyncio.get_running_loop()
     done = asyncio.Event()
-    box: Dict[str, Any] = {}
+    box: dict[str, Any] = {}
 
     def _run() -> None:
         try:
@@ -281,7 +283,9 @@ async def _run_in_daemon_thread(fn: Callable[[], Any], *, timeout: float) -> Any
                 # handler - the stray traceback this module is otherwise careful to avoid.
                 pass
 
-    threading.Thread(target=_run, daemon=True, name=f"atexit-{_describe(fn)[:40]}").start()
+    threading.Thread(
+        target=_run, daemon=True, name=f"atexit-{_describe(fn)[:40]}"
+    ).start()
 
     # Raises asyncio.TimeoutError, which the dispatcher turns into "abandoned, carry on".
     await asyncio.wait_for(done.wait(), timeout)
@@ -313,7 +317,7 @@ async def _call_bounded(callback: Callable[[], Any], timeout: float) -> None:
 
 
 async def _run_asyncio_atexits(
-    loop: asyncio.AbstractEventLoop, callbacks: List[Tuple[Callable[[], Any], float]]
+    loop: asyncio.AbstractEventLoop, callbacks: list[tuple[Callable[[], Any], float]]
 ) -> None:
     """
     Run atexit callbacks, bounded and independent (I1, I2).
@@ -332,7 +336,9 @@ async def _run_asyncio_atexits(
             )
         except Exception as e:
             log.warning(
-                "Unhandled exception in asyncio atexit callback %s: %s", _describe(callback), e
+                "Unhandled exception in asyncio atexit callback %s: %s",
+                _describe(callback),
+                e,
             )
         # BaseException (SystemExit, KeyboardInterrupt) is deliberately NOT caught: those mean
         # "stop everything", not "this obligation failed", so they abort the remaining
