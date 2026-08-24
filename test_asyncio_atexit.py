@@ -1,5 +1,4 @@
 import asyncio
-import sys
 
 try:
     import uvloop
@@ -10,36 +9,25 @@ import pytest
 
 import asyncio_atexit
 
-if sys.version_info >= (3, 7):
-    asyncio_run = asyncio.run
-else:
-
-    def asyncio_run(coro):
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(coro)
-        finally:
-            loop.close()
-
-
-policies = ["default"]
+loop_factories = [pytest.param(asyncio.new_event_loop, id="default")]
 if uvloop is not None:
-    policies.append("uvloop")
+    loop_factories.append(pytest.param(uvloop.new_event_loop, id="uvloop"))
 
 
-@pytest.fixture(params=policies)
-def policy(request):
-    before_policy = asyncio.get_event_loop_policy()
-    if request.param == "default":
-        policy = asyncio.DefaultEventLoopPolicy()
-    elif request.param == "uvloop":
-        policy = uvloop.EventLoopPolicy()
-    asyncio.set_event_loop_policy(policy)
-    yield
-    asyncio.set_event_loop_policy(before_policy)
+@pytest.fixture(params=loop_factories)
+def loop_factory(request):
+    return request.param
 
 
-def test_asyncio_atexit(policy):
+def _run(coro, loop_factory):
+    loop = loop_factory()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+def test_asyncio_atexit(loop_factory):
     sync_called = False
     async_called = False
 
@@ -56,12 +44,12 @@ def test_asyncio_atexit(policy):
         asyncio_atexit.register(sync_cb)
         asyncio_atexit.register(async_cb)
 
-    asyncio_run(test())
+    _run(test(), loop_factory)
     assert sync_called
     assert async_called
 
 
-def test_unregister(policy):
+def test_unregister(loop_factory):
     sync_called = False
 
     def sync_cb():
@@ -73,11 +61,11 @@ def test_unregister(policy):
         asyncio_atexit.register(sync_cb)
         asyncio_atexit.unregister(sync_cb)
 
-    asyncio_run(test())
+    _run(test(), loop_factory)
     assert not sync_called
 
 
-def test_run_raises(policy):
+def test_run_raises(loop_factory):
     sync_called = False
 
     def sync_cb():
@@ -89,6 +77,6 @@ def test_run_raises(policy):
         1 / 0
 
     with pytest.raises(ZeroDivisionError):
-        asyncio_run(test())
+        _run(test(), loop_factory)
 
     assert sync_called
